@@ -509,14 +509,44 @@ class GEMV(GPUScheduleRule):
 
             # reduce tile_s * tr * vec to tile_s * tr
             sch.reverse_compute_at(rf2, loop=bx, preserve_unit_loops=True)
-            tr, vec_c, ts = sch.get_loops(block=rf2)[1:]
+            rf2_loops = sch.get_loops(block=rf2)[1:]
+
+            while len(rf2_loops) > 3:
+                last_extent = sch.get(rf2_loops[-1]).extent
+                if isinstance(last_extent, tir.IntImm) and last_extent.value == 1:
+                    # If last loop is a unit loop, fuse it
+                    rf2_loops[-2] = sch.fuse(rf2_loops[-2], rf2_loops[-1])
+                    rf2_loops = sch.get_loops(block=rf2)[1:]
+                else:
+                    return None
+
+            if len(rf2_loops) == 3:
+                tr, vec_c, ts = rf2_loops
+            else:
+                return None
+
             sch.reorder(ts, tr, vec_c)
             sch.bind(ts, TAG_S)
             sch.bind(tr, TAG_R)
 
             # reduce tile_s * tr to tile_s
             sch.reverse_compute_at(gemv, loop=bx, preserve_unit_loops=True)
-            tr, ts = sch.get_loops(block=gemv)[1:]
+            gemv_loops = sch.get_loops(block=gemv)[1:]
+
+            while len(gemv_loops) > 2:
+                last_extent = sch.get(gemv_loops[-1]).extent
+                if isinstance(last_extent, tir.IntImm) and last_extent.value == 1:
+                    # If last loop is a unit loop, fuse it
+                    gemv_loops[-2] = sch.fuse(gemv_loops[-2], gemv_loops[-1])
+                    gemv_loops = sch.get_loops(block=gemv)[1:]
+                else:
+                    return None
+
+            if len(gemv_loops) == 2:
+                tr, ts = gemv_loops
+            else:
+                return None
+
             sch.reorder(ts, tr)
             sch.bind(ts, TAG_S)
             sch.bind(tr, TAG_R)
@@ -527,13 +557,20 @@ class GEMV(GPUScheduleRule):
             sch.set_scope(rf, buffer_index=0, storage_scope="local")
             sch.set_scope(rf2, buffer_index=0, storage_scope="local")
 
+            # Use flexible indexing for unroll annotations
+            rf2_all_loops = sch.get_loops(rf2)
+            if len(rf2_all_loops) > 3:
+                unroll_loop = rf2_all_loops[3]
+            else:
+                unroll_loop = rf2_all_loops[-1]
+
             sch.annotate(
-                block_or_loop=sch.get_loops(rf2)[3],
+                block_or_loop=unroll_loop,
                 ann_key="pragma_auto_unroll_max_step",
                 ann_val=UNROLL,
             )
             sch.annotate(
-                block_or_loop=sch.get_loops(rf2)[3], ann_key="pragma_unroll_explicit", ann_val=1
+                block_or_loop=unroll_loop, ann_key="pragma_unroll_explicit", ann_val=1
             )
 
             # Schedule epilogue
