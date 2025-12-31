@@ -168,43 +168,6 @@ def compile_metal(code, path_target=None, sdk="macosx", min_os_version=None):
     return libbin
 
 
-@tvm_ffi.register_global_func("tvm.contrib.xcode.supports_bf16")
-def supports_bf16(target=None):
-    """Check if Metal supports bfloat16.
-
-    Metal 3.1+ supports bfloat16 with simdgroup_bfloat types.
-
-    Parameters
-    ----------
-    target : tvm.target.Target, optional
-        The compilation target. If provided, checks the min_metal_version attribute.
-        If not provided, defaults to Metal 2.3 (no bf16 support).
-
-    Returns
-    -------
-    supported : bool
-        True if bfloat16 is supported.
-    """
-    from .. import target as tvm_target
-
-    # Check if target specifies min_metal_version, default to 2.3
-    metal_version = "2.3"
-    target = target or tvm_target.Target.current(allow_none=True)
-    if target:
-        min_metal_version = target.attrs.get("min_metal_version")
-        if min_metal_version:
-            metal_version = str(min_metal_version)
-
-    try:
-        # Parse version string (e.g., "3.1", "2.3")
-        major, minor = map(int, metal_version.split(".")[:2])
-        # Metal 3.1+ supports bfloat16
-        return major > 3 or (major == 3 and minor >= 1)
-    except (ValueError, IndexError):
-        # If we can't parse version, assume not supported for safety
-        return False
-
-
 def compile_coreml(model, model_name="main", out_dir="."):
     """Compile coreml model and return the compiled model path."""
     mlmodel_path = os.path.join(out_dir, model_name + ".mlmodel")
