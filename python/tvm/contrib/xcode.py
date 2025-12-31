@@ -23,7 +23,6 @@ import subprocess
 import json
 from ..base import py_str
 from . import utils
-from .. import ffi as tvm_ffi
 
 
 def xcrun(cmd):
