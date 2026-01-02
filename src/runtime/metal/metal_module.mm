@@ -102,7 +102,14 @@ class MetalModuleNode final : public ffi::ModuleObj {
 
     if (fmt_ == "metal") {
       MTLCompileOptions* opts = [MTLCompileOptions alloc];
-      opts.languageVersion = MTLLanguageVersion2_3;
+      // Use Metal 3.1 for bfloat16 simdgroup support if available
+      // Metal 3.1 requires macOS 14+ or iOS 17+
+      // Fallback to 2.3 if not available
+      if (@available(macOS 14.0, iOS 17.0, *)) {
+        opts.languageVersion = MTLLanguageVersion3_1;
+      } else {
+        opts.languageVersion = MTLLanguageVersion2_3;
+      }
       opts.fastMathEnabled = YES;
       // opts = nil;
       lib =
