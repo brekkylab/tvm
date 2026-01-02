@@ -348,6 +348,7 @@ def _linux_compile(
         if compile_shared or output.endswith(".so") or output.endswith(".dylib"):
             cmd += ["-shared"]
     cmd += ["-o", output]
+    cmd += ["-x", "c++", "-std=c++17"]
     if isinstance(objects, str):
         cmd += [objects]
     else:
